@@ -1,41 +1,50 @@
 #!/usr/bin/python3
-"""Script to starts a Flask web application and use storage
-for fetching data from the storage engine"""
+'''A simple Flask web application.
+'''
 from flask import Flask, render_template
-from markupsafe import escape
-from models.state import State
-from models.city import City
+
 from models import storage
+from models.state import State
+
+
 app = Flask(__name__)
+'''The Flask application instance.'''
+app.url_map.strict_slashes = False
 
 
-@app.route("/states", strict_slashes=False)
-@app.route("/states/<string:id>", strict_slashes=False)
-def cities_states(id=''):
-    """This method display list of all State present in DBStorage
-    sorted by name"""
-    exist = 1
-    escaped_id = escape(id)
-
-    if (escaped_id == ''):
-        values = list(storage.all(State).values())
-        return (render_template('/9-states.html', states=values,
-                                exist=exist, id=escaped_id))
+@app.route('/states')
+@app.route('/states/<id>')
+def states(id=None):
+    '''The states page.'''
+    states = None
+    state = None
+    all_states = list(storage.all(State).values())
+    case = 404
+    if id is not None:
+        res = list(filter(lambda x: x.id == id, all_states))
+        if len(res) > 0:
+            state = res[0]
+            state.cities.sort(key=lambda x: x.name)
+            case = 2
     else:
-        values = [storage.all(State).get('State.{:s}'.format(escaped_id))]
-
-    if (values[0] is None):
-        exist = 0
-
-    return (render_template('/9-states.html', states=values,
-                            exist=exist, id=escaped_id))
+        states = all_states
+        for state in states:
+            state.cities.sort(key=lambda x: x.name)
+        states.sort(key=lambda x: x.name)
+        case = 1
+    ctxt = {
+        'states': states,
+        'state': state,
+        'case': case
+    }
+    return render_template('9-states.html', **ctxt)
 
 
 @app.teardown_appcontext
-def close_session(self):
-    """This method remove the current SQLAlchemy Session"""
+def flask_teardown(exc):
+    '''The Flask app/request context end event listener.'''
     storage.close()
 
 
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host='0.0.0.0', port='5000')

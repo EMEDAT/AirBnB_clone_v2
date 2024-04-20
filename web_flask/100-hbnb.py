@@ -1,31 +1,45 @@
 #!/usr/bin/python3
-"""Script to starts a Flask web application and use storage for fetching data from the storage engine"""
-from flask import Flask, render_template
-from markupsafe import escape
-from models.state import State
-from models.city import City
-from models.user import User
-from models.place import Place
+'''A simple Flask web application.
+'''
+from flask import Flask, render_template, Markup
+
 from models import storage
 from models.amenity import Amenity
+from models.place import Place
 from models.state import State
+
+
 app = Flask(__name__)
+'''The Flask application instance.'''
+app.url_map.strict_slashes = False
 
 
-@app.route("/hbnb", strict_slashes=False)
+@app.route('/hbnb')
 def hbnb():
-    """Display a HTML page like 6-index.html"""
+    '''The hbnb page.'''
+    all_states = list(storage.all(State).values())
     amenities = list(storage.all(Amenity).values())
-    states = list(storage.all(State).values())
     places = list(storage.all(Place).values())
-    users = storage.all(User)
+    all_states.sort(key=lambda x: x.name)
+    amenities.sort(key=lambda x: x.name)
+    places.sort(key=lambda x: x.name)
+    for state in all_states:
+        state.cities.sort(key=lambda x: x.name)
+    for place in places:
+        place.description = Markup(place.description)
+    ctxt = {
+        'states': all_states,
+        'amenities': amenities,
+        'places': places
+    }
+    return render_template('100-hbnb.html', **ctxt)
 
-    return (render_template('/100-hbnb.html', amenities=amenities, states=states, places=places, users=users))
 
 @app.teardown_appcontext
-def close_session(self):
-    """This method remove the current SQLAlchemy Session"""
+def flask_teardown(exc):
+    '''The Flask app/request context end event listener.'''
     storage.close()
 
+
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host='0.0.0.0', port='5000')
